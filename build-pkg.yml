@@ -1,0 +1,36 @@
+name: Build PS4 PKG
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master]
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install compiler
+        run: sudo apt-get update && sudo apt-get install -y clang lld jq python3
+
+      - name: Download OpenOrbis toolchain
+        run: |
+          TAG=$(curl -s https://api.github.com/repos/OpenOrbis/OpenOrbis-PS4-Toolchain/releases/latest | jq -r .tag_name)
+          echo "Toolchain release: $TAG"
+          mkdir -p "$HOME/OpenOrbisSDK"
+          curl -L "https://github.com/OpenOrbis/OpenOrbis-PS4-Toolchain/releases/download/$TAG/$TAG.tar.gz" \
+            | tar -xz -C "$HOME/OpenOrbisSDK" bin/data bin/linux include lib scripts LICENSE link.x
+          chmod +x "$HOME"/OpenOrbisSDK/bin/linux/*
+          echo "OO_PS4_TOOLCHAIN=$HOME/OpenOrbisSDK" >> "$GITHUB_ENV"
+
+      - name: Build PKG
+        env:
+          DOTNET_SYSTEM_GLOBALIZATION_INVARIANT: "1"
+        run: make
+
+      - name: Upload PKG
+        uses: actions/upload-artifact@v4
+        with:
+          name: m7mddz-pkg
+          path: "*.pkg"
